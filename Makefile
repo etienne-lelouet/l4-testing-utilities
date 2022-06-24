@@ -1,14 +1,14 @@
 CC=g++
 CFLAGS=-Wall -g `pkg-config --cflags --libs libuv`
 
-TARGETS=server client
+TARGETS=server tcpclient
 
 all: $(TARGETS)
 
 server:	server.cpp
 	$(CC) $^ $(CFLAGS) -o $@
 
-client: client.cpp
+tpcclient: tcpclient.cpp
 	$(CC) $^ $(CFLAGS) -o $@
 
 clean:

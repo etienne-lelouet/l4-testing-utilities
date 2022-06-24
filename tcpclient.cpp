@@ -91,8 +91,8 @@ void on_connect_cb(uv_connect_t *req, int status)
 
 void timer_cb(uv_timer_t *handle)
 {
-	printf("timer tick : n_initiated_connections = %d, n_current_connections = %d \n", n_initiated_connections, n_current_connections);
-	if (initiated_connections.size() >= N_MAX_PARALLEL_CONNECTIONS)
+	printf("timer tick : n_initiated_connections = %d, n_current_connections = %d \n", initiated_connections.size(), active_connections.size());
+	if (initiated_connections.size() + active_connections.size() >= N_MAX_PARALLEL_CONNECTIONS)
 	{
 		puts("n_initiated_connections >= N_MAX_PARALLEL_CONNECTIONS");
 		return;
