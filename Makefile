@@ -8,7 +8,7 @@ all: $(TARGETS)
 server:	server.cpp
 	$(CC) $^ $(CFLAGS) -o $@
 
-tpcclient: tcpclient.cpp
+tcpclient: tcpclient.cpp
 	$(CC) $^ $(CFLAGS) -o $@
 
 clean:
