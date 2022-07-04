@@ -45,7 +45,7 @@ void on_close_opened_conn(uv_handle_t *handle)
 
 void on_fail_open(uv_handle_t *handle)
 {
-	puts("connection failed");
+	puts("removing from list");
 	auto it = find(initiated_connections.begin(), initiated_connections.end(), handle);
 	if (it != initiated_connections.end())
 	{
@@ -103,8 +103,11 @@ void on_connect_cb(uv_connect_t *req, int status)
 {
 	if (status != 0)
 	{
-		puts("connection failed, removing from list");
-		uv_close((uv_handle_t *)req->handle, on_fail_open);
+		puts("connection failed");
+		if (!uv_is_closing((uv_handle_t *)req->handle))
+		{
+			uv_close((uv_handle_t *)req->handle, on_fail_open);
+		}
 		return;
 	}
 	puts("connected");
