@@ -22,11 +22,15 @@ uv_timer_t timer;
 
 static void on_close_cb(uv_handle_t *req)
 {
+#ifdef DEBUG
 	puts("in on_close_cb");
+#endif
 	auto it = find(connection_list.begin(), connection_list.end(), (uv_handle_t *)req);
 	if (it != connection_list.end())
 	{
+#ifdef DEBUG
 		puts("found in list, freeing and erasing");
+#endif
 		free(*it);
 		connection_list.erase(it);
 	}
@@ -34,10 +38,14 @@ static void on_close_cb(uv_handle_t *req)
 
 void on_close_server(uv_handle_t *handle)
 {
+#ifdef DEBUG
 	puts("server shutdown completed, closing active_connections");
+#endif
 	for (auto it : connection_list)
 	{
+#ifdef DEBUG
 		puts("closing one connection");
+#endif
 		uv_close((uv_handle_t *)it, on_close_cb);
 	}
 }
@@ -56,7 +64,9 @@ void on_write_cb(uv_write_t *req, int status)
 		printf("on_write_cb error : %s\n", uv_strerror(status));
 		uv_close((uv_handle_t *)req->handle, on_close_cb);
 	}
+#ifdef DEBUG
 	puts("writer cb, freeing req");
+#endif
 	free(req);
 }
 
@@ -64,7 +74,9 @@ void read_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 {
 	if (nread == UV_EOF)
 	{
+#ifdef DEBUG
 		puts("read UV_EOF");
+#endif
 		uv_close((uv_handle_t *)stream, on_close_cb);
 	}
 	else if (nread < 0)
@@ -75,7 +87,9 @@ void read_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 	if (nread > 0)
 	{
 		uv_write_t *req = (uv_write_t *)malloc(sizeof(uv_write_t));
+#ifdef DEBUG
 		printf("buf->base = %s\n", buf->base);
+#endif
 		uv_write(req, stream, buf, 1, on_write_cb);
 	}
 }
@@ -93,7 +107,9 @@ void on_connection_cb(uv_stream_t *server, int status)
 		printf("on_connection_cb error : %s\n", uv_strerror(status));
 		return;
 	}
+#ifdef DEBUG
 	puts("connection request received");
+#endif
 	uv_tcp_t *client = (uv_tcp_t *)malloc(sizeof(uv_tcp_t));
 	uv_tcp_init(loop, client);
 	uv_accept(server, (uv_stream_t *)client);

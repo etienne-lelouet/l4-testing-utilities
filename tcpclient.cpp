@@ -33,7 +33,9 @@ void on_close_opened_conn(uv_handle_t *handle)
 	auto it = find(active_connections.begin(), active_connections.end(), handle);
 	if (it != active_connections.end())
 	{
+#ifdef DEBUG
 		puts("found in list of opened connections, freeing and removing from vec");
+#endif
 		free(*it);
 		active_connections.erase(it);
 	}
@@ -45,7 +47,9 @@ void on_close_opened_conn(uv_handle_t *handle)
 
 void on_fail_open(uv_handle_t *handle)
 {
+#ifdef DEBUG
 	puts("removing from list");
+#endif
 	auto it = find(initiated_connections.begin(), initiated_connections.end(), handle);
 	if (it != initiated_connections.end())
 	{
@@ -62,7 +66,9 @@ void read_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 {
 	if (nread == UV_EOF)
 	{
+#ifdef DEBUG
 		puts("read UV_EOF");
+#endif
 		uv_close((uv_handle_t *)stream, on_close_opened_conn);
 		return;
 	}
@@ -89,7 +95,9 @@ void on_write_cb(uv_write_t *req, int status)
 		printf("on_write_cb error : %s\n", uv_strerror(status));
 		uv_close((uv_handle_t *)req->handle, on_close_opened_conn);
 	}
+#ifdef DEBUG
 	puts("writer cb, freeing req");
+#endif
 	free(req);
 }
 
@@ -110,16 +118,22 @@ void on_connect_cb(uv_connect_t *req, int status)
 		}
 		return;
 	}
+#ifdef DEBUG
 	puts("connected");
+#endif
 	auto it = find(initiated_connections.begin(), initiated_connections.end(), (uv_handle_t *)req->handle);
 	if (it != initiated_connections.end())
 	{
+#ifdef DEBUG
 		puts("found in list of initiated connections, removing");
+		#endif
 		initiated_connections.erase(it);
 	}
 	else
 	{
+#ifdef DEBUG
 		puts("error, handle not found in list of initiated connections");
+#endif
 	}
 	active_connections.push_back((uv_handle_t *)req->handle);
 	uv_read_start(req->handle, alloc_cb, read_cb);
@@ -153,7 +167,9 @@ void timer_cb_send(uv_timer_t *handle)
 
 	for (auto it : active_connections)
 	{
+#ifdef DEBUG
 		puts("timer_cb, writing");
+#endif
 		uv_write_t *req = (uv_write_t *)malloc(sizeof(uv_write_t));
 		uv_write(req, (uv_stream_t *)it, tosend, 1, on_write_cb);
 	}
@@ -173,12 +189,16 @@ void shutdown_client(int sig)
 	}
 	for (auto it : initiated_connections)
 	{
+#ifdef DEBUG
 		puts("closing initiated_connections");
+#endif
 		uv_close(it, on_fail_open);
 	}
 	for (auto it : active_connections)
 	{
+#ifdef DEBUG
 		puts("closing active_connections");
+#endif
 		uv_close(it, on_close_opened_conn);
 	}
 }

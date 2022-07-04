@@ -1,9 +1,13 @@
 CC=g++
-CFLAGS=-Wall -g `pkg-config --cflags --libs libuv`
+CFLAGS=-Wall `pkg-config --cflags --libs libuv`
 
 TARGETS=server tcpclient
 
+all: CFLAGS+=-O3
 all: $(TARGETS)
+
+debug: CFLAGS+=-g -DDEBUG -O0
+debug: $(TARGETS)
 
 server:	server.cpp
 	$(CC) $^ $(CFLAGS) -o $@
