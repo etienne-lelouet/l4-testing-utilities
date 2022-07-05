@@ -112,6 +112,7 @@ void on_connection_cb(uv_stream_t *server, int status)
 #endif
 	uv_tcp_t *client = (uv_tcp_t *)malloc(sizeof(uv_tcp_t));
 	uv_tcp_init(loop, client);
+	uv_tcp_simultaneous_accepts((uv_tcp_t *)server, 1);
 	uv_accept(server, (uv_stream_t *)client);
 	connection_list.push_back((uv_handle_t *)client);
 	uv_read_start((uv_stream_t *)client, alloc_cb, read_cb);
