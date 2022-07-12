@@ -19,6 +19,7 @@ uv_loop_t *loop;
 vector<uv_handle_t *> connection_list;
 uv_tcp_t server;
 uv_timer_t timer;
+bool echo = false;
 
 static void on_close_cb(uv_handle_t *req)
 {
@@ -86,11 +87,14 @@ void read_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 	}
 	if (nread > 0)
 	{
-		uv_write_t *req = (uv_write_t *)malloc(sizeof(uv_write_t));
 #ifdef DEBUG
 		printf("buf->base = %s\n", buf->base);
 #endif
-		uv_write(req, stream, buf, 1, on_write_cb);
+		if (echo)
+		{
+			uv_write_t *req = (uv_write_t *)malloc(sizeof(uv_write_t));
+			uv_write(req, stream, buf, 1, on_write_cb);
+		}
 	}
 }
 
@@ -128,7 +132,7 @@ int main(int argc, char **argv)
 	int opt;
 	string ip = "0.0.0.0";
 	long port = 6969;
-	while ((opt = getopt(argc, argv, ":i:p:")) != -1)
+	while ((opt = getopt(argc, argv, ":i:p:e")) != -1)
 	{
 		switch (opt)
 		{
@@ -137,6 +141,9 @@ int main(int argc, char **argv)
 			break;
 		case 'p':
 			port = strtoul(optarg, NULL, 0);
+			break;
+		case 'e':
+			echo = true;
 			break;
 		case ':':
 			printf("option -%c needs a value\n", optopt);
@@ -154,7 +161,7 @@ int main(int argc, char **argv)
 
 	if (port >= (1 << 16) || port == 0)
 	{
-		printf("port number must be striclty superior to 0 and strinctly inferior to %d, is %ld \n", (1 << 16), port);
+		printf("port number must be striclty superior to 0 and strinctly inferior to %d, is %lu \n", (1 << 16), port);
 	}
 
 	struct sockaddr_in addr;
@@ -166,6 +173,7 @@ int main(int argc, char **argv)
 		printf("uv_ip4_addr error : %s\n", uv_strerror(err));
 		exit(0);
 	}
+	printf("server listening on addr %s and port %lu \n", ip.c_str(), port);
 	err = uv_tcp_bind(&server, (const struct sockaddr *)&addr, 0);
 	if (err < 0)
 	{
