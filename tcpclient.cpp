@@ -5,24 +5,18 @@
 #include <vector>
 #include <algorithm>
 #include <string>
-#include <unistd.h>
 #include <arpa/nameser.h>
 #include <resolv.h>
 #include <string.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
+#include "argsparser.h"
 
 using namespace std;
 
 #define N_MAX_PARALLEL_CONNECTIONS 2
 
-string ip;
-string hostname;
-unsigned long port;
-int delay_ms;
-int N_QUERIES;
-uv_timer_cb timer_cb;
-unsigned long n_max_parallel_connections;
+ArgumentParser args;
 int n_current_connections = 0;
 int n_initiated_connections = 0;
 uv_loop_t *loop;
@@ -152,8 +146,8 @@ void on_connect_cb(uv_connect_t *req, int status)
 
 void timer_cb_nosend(uv_timer_t *handle)
 {
-	printf("timer tick : n_initiated_connections = %lu, n_current_connections = %lu, total_connections : %lu, max_connections : %lu \n", initiated_connections.size(), active_connections.size(), initiated_connections.size() + active_connections.size(), n_max_parallel_connections);
-	while ((initiated_connections.size() + active_connections.size()) < n_max_parallel_connections)
+	printf("timer tick : n_initiated_connections = %lu, n_current_connections = %lu, total_connections : %lu, max_connections : %lu \n", initiated_connections.size(), active_connections.size(), initiated_connections.size() + active_connections.size(), args.n_sockets);
+	while ((initiated_connections.size() + active_connections.size()) < args.n_sockets)
 	{
 		uv_tcp_t *sock = (uv_tcp_t *)malloc(sizeof(uv_tcp_t));
 		uv_tcp_init(loop, sock);
@@ -165,8 +159,8 @@ void timer_cb_nosend(uv_timer_t *handle)
 
 void timer_cb_send(uv_timer_t *handle)
 {
-	printf("timer tick : n_initiated_connections = %lu, n_current_connections = %lu, total_connections : %lu, max_connections : %lu \n", initiated_connections.size(), active_connections.size(), initiated_connections.size() + active_connections.size(), n_max_parallel_connections);
-	while ((initiated_connections.size() + active_connections.size()) < n_max_parallel_connections)
+	printf("timer tick : n_initiated_connections = %lu, n_current_connections = %lu, total_connections : %lu, max_connections : %lu \n", initiated_connections.size(), active_connections.size(), initiated_connections.size() + active_connections.size(), args.n_sockets);
+	while ((initiated_connections.size() + active_connections.size()) < args.n_sockets)
 	{
 		uv_tcp_t *sock = (uv_tcp_t *)malloc(sizeof(uv_tcp_t));
 		uv_tcp_init(loop, sock);
@@ -181,15 +175,15 @@ void timer_cb_send(uv_timer_t *handle)
 #ifdef DEBUG
 		puts("timer_cb, writing");
 #endif
-		if (get<1>(*it) < N_QUERIES)
-		{
-			printf("timer tick : seent %d / %d queries\n", get<1>(*it), N_QUERIES);
-			uv_write_t *req = (uv_write_t *)malloc(sizeof(uv_write_t));
-			struct uv_buf_t buf = uv_buf_init(tcp_msg, tcp_msg_len);
-			uv_write(req, (uv_stream_t *)get<0>(*it), &buf, 1, on_write_cb);
-			get<1>(*it) = get<1>(*it) + 1;
-			printf("timer tick : seent %d / %d queries\n", get<1>(*it), N_QUERIES);
-		}
+		// if (get<1>(*it) < N_QUERIES)
+		// {
+		// 	printf("timer tick : seent %d / %d queries\n", get<1>(*it), N_QUERIES);
+		// 	uv_write_t *req = (uv_write_t *)malloc(sizeof(uv_write_t));
+		// 	struct uv_buf_t buf = uv_buf_init(tcp_msg, tcp_msg_len);
+		// 	uv_write(req, (uv_stream_t *)get<0>(*it), &buf, 1, on_write_cb);
+		// 	get<1>(*it) = get<1>(*it) + 1;
+		// 	printf("timer tick : seent %d / %d queries\n", get<1>(*it), N_QUERIES);
+		// }
 	}
 }
 
@@ -223,100 +217,45 @@ void shutdown_client(int sig)
 
 int main(int argc, char **argv)
 {
-	ip = "127.0.0.1";
-	hostname = "jeanpierre.moe";
-	port = 6969;
-	delay_ms = 1000;
-	N_QUERIES = 1;
-	timer_cb = timer_cb_nosend;
-	n_max_parallel_connections = N_MAX_PARALLEL_CONNECTIONS;
-	int opt;
-	while ((opt = getopt(argc, argv, ":i:p:n:s:N:H:")) != -1)
-	{
-		puts("ici");
-		switch (opt)
-		{
-		case 'i':
-			puts("i");
-			ip = optarg;
-			break;
-		case 'p':
-			puts("p");
-			port = strtoul(optarg, NULL, 0);
-			break;
-		case 'n':
-			puts("n");
-			n_max_parallel_connections = strtoul(optarg, NULL, 0);
-			break;
-		case 's':
-			puts("s");
-			timer_cb = timer_cb_send;
-			delay_ms = atoi(optarg);
-			break;
-		case 'N':
-			puts("N");
-			N_QUERIES = atoi(optarg);
-			break;
-		case 'H':
-			puts("H");
-			hostname = optarg;
-			break;
-		case ':':
-			printf("option -%c needs a value\n", optopt);
-			break;
-		case '?':
-			printf("unknown option : -%c\n", optopt);
-			break;
-		}
-	}
-
 	if (signal(SIGINT, shutdown_client) == SIG_ERR)
 	{
 		perror("signal");
 		exit(1);
 	}
-
-	if (port >= (1 << 16) || port == 0)
+	args = ArgumentParser();
+	if (args.parse_arguments(argc, argv) != 0)
 	{
-		printf("port number must be striclty superior to 0 and strinctly inferior to %d, is %lu \n", (1 << 16), port);
+		return -1;
 	}
 	loop = uv_default_loop();
-	int err = uv_ip4_addr(ip.c_str(), port, &dest);
-	printf("client querying addr %s and port %lu \n", ip.c_str(), port);
+	int err = uv_ip4_addr(args.ip.c_str(), args.port, &dest);
 	if (err < 0)
 	{
 		printf("uv_ip4_addr error : %s\n", uv_strerror(err));
 		exit(0);
+		args.print_arguments();
 	}
 	int query_len;
-	if (timer_cb == timer_cb_send)
+	dns_msg = (char *)malloc(PACKETSZ),
+	query_len = res_mkquery(QUERY, args.query_name.c_str(), ns_c_in, ns_t_a, NULL, 0, NULL, (unsigned char *)dns_msg, PACKETSZ);
+	if (query_len <= 0)
 	{
-		dns_msg = (char *)malloc(PACKETSZ),
-		query_len = res_mkquery(QUERY, hostname.c_str(), ns_c_in, ns_t_a, NULL, 0, NULL, (unsigned char *)dns_msg, PACKETSZ);
-		if (query_len <= 0)
-		{
-			puts("error creating the dns_msg wih res_mkquery");
-			free(dns_msg);
-			goto end;
-		}
-		else
-		{
-			dns_msg_len = (size_t)query_len;
-			tcp_msg_len = dns_msg_len + 2;
-			tcp_msg = (char *)malloc(tcp_msg_len);
-			// write pkt len
-			uint16_t plen = htons(query_len);
-			memcpy(tcp_msg, &plen, sizeof(plen));
-			// write wire
-			memcpy(tcp_msg + 2, dns_msg, dns_msg_len);
-			// // write id requested
-			// uint16_t _id = ntohs(id);
-			// memcpy(buf.get() + 2 + offset, &_id, sizeof(_id));
-			free(dns_msg);
-		}
+		puts("error creating the dns_msg wih res_mkquery");
+		free(dns_msg);
+		goto end;
+	}
+	else
+	{
+		dns_msg_len = (size_t)query_len;
+		tcp_msg_len = dns_msg_len + 2;
+		tcp_msg = (char *)malloc(tcp_msg_len);
+		uint16_t plen = htons(query_len);
+		memcpy(tcp_msg, &plen, sizeof(plen));
+		memcpy(tcp_msg + 2, dns_msg, dns_msg_len);
+		free(dns_msg);
 	}
 	uv_timer_init(loop, &timer);
-	uv_timer_start(&timer, timer_cb, 0, delay_ms);
+	uv_timer_start(&timer, timer_cb_send, 0, args.ms_delay_between_batch);
 	uv_run(loop, UV_RUN_DEFAULT);
 end:
 	uv_loop_close(loop);
