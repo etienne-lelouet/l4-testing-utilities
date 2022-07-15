@@ -13,6 +13,8 @@
 #include <gnutls/gnutls.h>
 #include <gnutls/x509.h>
 #include <assert.h>
+#include <unistd.h>
+#include <ctime>
 
 #include "argsparser.h"
 
@@ -32,7 +34,7 @@ gnutls_session_t session;
 ArgumentParser args;
 int n_current_connections = 0;
 int n_initiated_connections = 0;
-uv_loop_t *loop;
+
 uv_timer_t timer;
 struct sockaddr_in dest;
 uv_tcp_t *tcp_sock;
@@ -57,6 +59,19 @@ void on_close_opened_conn(uv_handle_t *handle)
 {
 	puts("on_close_opened_conn");
 	free(tcp_sock);
+}
+void on_tcp_shutdown(uv_shutdown_t *req, int status)
+{
+	puts("on tcp shutdown");
+	if (status < 0)
+	{
+		printf("on_tcp_shutdown error : %s\n", uv_strerror(status));
+	}
+	if (!uv_is_closing((uv_handle_t *)req->handle))
+	{
+		uv_close((uv_handle_t *)req->handle, on_close_opened_conn);
+	}
+	free(req);
 }
 
 void on_fail_open(uv_handle_t *handle)
@@ -94,17 +109,19 @@ void read_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 {
 	if (nread == UV_EOF)
 	{
-#ifdef DEBUG
 		puts("read UV_EOF");
-#endif
-		uv_close((uv_handle_t *)stream, on_close_opened_conn);
-		return;
+		if (connstat == TLS_ESTAB_E || connstat == TLS_CLOSING_E)
+		{
+			puts("read UV_EOF, closing");
+			uv_read_stop((uv_stream_t *)stream);
+			uv_close((uv_handle_t *)stream, on_close_opened_conn);
+		}
 	}
 	else if (nread < 0)
 	{
 		printf("read_cb error : %s, closing connection\n", uv_strerror(nread));
 	}
-	if (nread > 0)
+	else if (nread > 0)
 	{
 		printf("nread : %lu \n", nread);
 		recv_buffer.append(buf->base, nread);
@@ -157,22 +174,18 @@ void read_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf)
 			}
 		}
 	}
-	if (buf->base)
-	{
-		free(buf->base);
-	}
+	puts("freeing buf");
+	free(buf->base);
 }
 
 void on_write_cb(uv_write_t *req, int status)
 {
 	if (status < 0)
 	{
-		printf("on_write_cb error : %s, closing connection\n", uv_strerror(status));
-		uv_close((uv_handle_t *)req->handle, on_close_opened_conn);
+		printf("on_write_cb error : %s\n", uv_strerror(status));
 	}
-#ifdef DEBUG
 	puts("writer cb, freeing req");
-#endif
+	printf("req->data %p \n", req->data);
 	free(req->data);
 	free(req);
 }
@@ -211,7 +224,21 @@ void on_connect_cb(uv_connect_t *req, int status)
 void shutdown_client(int sig)
 {
 	puts("shutdown client");
-	uv_close((uv_handle_t *)tcp_sock, on_close_opened_conn);
+	connstat = TLS_CLOSING_E;
+	int err = gnutls_bye(session, GNUTLS_SHUT_WR);
+	if (err == GNUTLS_E_SUCCESS)
+	{
+		puts("gnutls_bye success");
+	}
+	else
+	{
+		printf("gnutls_bye error : %s\n", gnutls_strerror(err));
+	}
+	puts("stoping reads");
+	uv_shutdown_t *shutdown_req = (uv_shutdown_t *)malloc(sizeof(uv_shutdown_t));
+	puts("shutting down write end");
+	int result = uv_shutdown(shutdown_req, (uv_stream_t *)tcp_sock, on_tcp_shutdown);
+	printf("uv_shutdown result = %s", uv_strerror(result));
 }
 
 static ssize_t gnutls_pull_trampoline(gnutls_transport_ptr_t h, void *buf, size_t len)
@@ -222,9 +249,7 @@ static ssize_t gnutls_pull_trampoline(gnutls_transport_ptr_t h, void *buf, size_
 		puts("gnutls_pull_trampoline not empty");
 		len = std::min(len, recv_buffer.size());
 		memcpy(buf, recv_buffer.data(), len);
-		printf("len = %lu, recv_buffer.size() %lu\n", len, recv_buffer.size());
 		recv_buffer.erase(0, len);
-		printf("len = %lu, recv_buffer.size() %lu\n", len, recv_buffer.size());
 		return len;
 	}
 
@@ -238,6 +263,7 @@ static ssize_t gnutls_push_trampoline(gnutls_transport_ptr_t h, const void *buf,
 	uv_write_t *req = (uv_write_t *)malloc(sizeof(uv_write_t));
 	char *data = (char *)malloc(len);
 	req->data = data;
+	printf("req->data %p \n", req->data);
 	memcpy(data, buf, len);
 	/*
 	cette fonction est sensée reprendre la sémantique de write, donc j'imagine que le pointeur passé en arg
@@ -253,6 +279,7 @@ static ssize_t gnutls_push_trampoline(gnutls_transport_ptr_t h, const void *buf,
 
 int main(int argc, char **argv)
 {
+	printf("pid: %d\n", getpid());
 	if (signal(SIGINT, shutdown_client) == SIG_ERR)
 	{
 		perror("signal");
@@ -263,7 +290,6 @@ int main(int argc, char **argv)
 	{
 		return -1;
 	}
-	loop = uv_default_loop();
 	int err = uv_ip4_addr(args.ip.c_str(), args.port, &dest);
 	if (err < 0)
 	{
@@ -314,12 +340,20 @@ int main(int argc, char **argv)
 	}
 	connstat = NOTHING_E;
 	tcp_sock = (uv_tcp_t *)malloc(sizeof(uv_tcp_t));
-	loop = uv_default_loop();
+	uv_loop_t *loop = uv_default_loop();
 	uv_tcp_init(loop, tcp_sock);
 	uv_connect_t *connect = (uv_connect_t *)malloc(sizeof(uv_connect_t));
 	uv_tcp_connect(connect, (uv_tcp_t *)tcp_sock, (const struct sockaddr *)&dest, on_connect_cb);
 	uv_timer_init(loop, &timer);
 	uv_run(loop, UV_RUN_DEFAULT);
-	uv_loop_close(loop);
+	int close_res = uv_loop_close(loop);
+	if (close_res == EAGAIN) {
+		puts("close_res == EAGAIN");
+	}
+	free(tcp_msg);
+
+	gnutls_deinit(session);
+	gnutls_certificate_free_credentials(session_creds);
+	gnutls_global_deinit();
 	return 0;
 }
