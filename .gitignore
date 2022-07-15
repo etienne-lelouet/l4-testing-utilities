@@ -2,4 +2,6 @@
 **/tcpclient
 **/server
 **/udpclient
+**/*.o
+**/tlsclient
 **/.vscode/*

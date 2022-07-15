@@ -233,8 +233,8 @@ int main(int argc, char **argv)
 	{
 		printf("uv_ip4_addr error : %s\n", uv_strerror(err));
 		exit(0);
-		args.print_arguments();
 	}
+	args.print_arguments();
 	int query_len;
 	dns_msg = (char *)malloc(PACKETSZ),
 	query_len = res_mkquery(QUERY, args.query_name.c_str(), ns_c_in, ns_t_a, NULL, 0, NULL, (unsigned char *)dns_msg, PACKETSZ);
