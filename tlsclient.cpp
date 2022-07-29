@@ -80,10 +80,20 @@ void on_fail_open(uv_handle_t *handle)
 	free(tcp_sock);
 }
 
+void timer_cb_send(uv_timer_t *handle)
+{
+	puts("timer_cb, writing");
+	ssize_t sent = gnutls_record_send(session, tcp_msg, tcp_msg_len);
+	if (sent < 0)
+	{
+		printf("Error in sending data: %s", gnutls_strerror(sent));
+	}
+}
+
 void tls_conn_cb()
 {
 	puts("tls_conn_cb");
-	// uv_timer_start(&timer, timer_cb_send, 0, args.ms_delay_between_batch);
+	uv_timer_start(&timer, timer_cb_send, 0, args.ms_delay_between_batch);
 }
 
 void tls_handshake()
@@ -196,21 +206,6 @@ void alloc_cb(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf)
 	buf->len = suggested_size;
 }
 
-void timer_cb_send(uv_timer_t *handle)
-{
-#ifdef DEBUG
-	puts("timer_cb, writing");
-#endif
-	// if (get<1>(*it) < N_QUERIES)
-	// {
-	// 	printf("timer tick : seent %d / %d queries\n", get<1>(*it), N_QUERIES);
-	// 	uv_write_t *req = (uv_write_t *)malloc(sizeof(uv_write_t));
-	// 	struct uv_buf_t buf = uv_buf_init(tcp_msg, tcp_msg_len);
-	// 	uv_write(req, (uv_stream_t *)get<0>(*it), &buf, 1, on_write_cb);
-	// 	get<1>(*it) = get<1>(*it) + 1;
-	// 	printf("timer tick : seent %d / %d queries\n", get<1>(*it), N_QUERIES);
-	// }
-}
 void on_connect_cb(uv_connect_t *req, int status)
 {
 	puts("setting status to TLS_HANDSHAKE_E");
@@ -223,6 +218,7 @@ void on_connect_cb(uv_connect_t *req, int status)
 
 void shutdown_client(int sig)
 {
+	uv_timer_stop(&timer);
 	puts("shutdown client");
 	connstat = TLS_CLOSING_E;
 	int err = gnutls_bye(session, GNUTLS_SHUT_WR);
@@ -295,8 +291,8 @@ int main(int argc, char **argv)
 	{
 		printf("uv_ip4_addr error : %s\n", uv_strerror(err));
 		exit(0);
-		args.print_arguments();
 	}
+	args.print_arguments();
 
 	if (gnutls_check_version("3.4.6") == NULL)
 	{
@@ -343,11 +339,12 @@ int main(int argc, char **argv)
 	uv_loop_t *loop = uv_default_loop();
 	uv_tcp_init(loop, tcp_sock);
 	uv_connect_t *connect = (uv_connect_t *)malloc(sizeof(uv_connect_t));
-	uv_tcp_connect(connect, (uv_tcp_t *)tcp_sock, (const struct sockaddr *)&dest, on_connect_cb);
+	uv_tcp_connect(connect, tcp_sock, (const struct sockaddr *)&dest, on_connect_cb);
 	uv_timer_init(loop, &timer);
 	uv_run(loop, UV_RUN_DEFAULT);
 	int close_res = uv_loop_close(loop);
-	if (close_res == EAGAIN) {
+	if (close_res == EAGAIN)
+	{
 		puts("close_res == EAGAIN");
 	}
 	free(tcp_msg);

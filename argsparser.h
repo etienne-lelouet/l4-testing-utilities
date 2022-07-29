@@ -11,7 +11,8 @@ public:
 	long n_sockets;
 	long total_duration_ms;
 	std::string query_name;
-
+	unsigned long max_queries_per_socket;
+	unsigned long max_queries_total;
 	ArgumentParser();
 
 	int parse_arguments(int argc, char **argv);

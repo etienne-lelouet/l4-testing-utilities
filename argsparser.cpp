@@ -6,7 +6,7 @@
 
 using namespace std;
 
-ArgumentParser::ArgumentParser() : ip("127.0.0.1"), port(6000), ms_delay_between_batch(1000), n_queries_per_batch(1), n_sockets(1), total_duration_ms(10000), query_name("jeanpierre.moe") {}
+ArgumentParser::ArgumentParser() : ip("127.0.0.1"), port(6000), ms_delay_between_batch(1000), n_queries_per_batch(1), n_sockets(1), total_duration_ms(10000), query_name("jeanpierre.moe"), max_queries_per_socket(10), max_queries_total(10) {}
 
 int ArgumentParser::parse_arguments(int argc, char **argv)
 {
@@ -70,6 +70,8 @@ int ArgumentParser::parse_arguments(int argc, char **argv)
 			break;
 		}
 	}
+	max_queries_per_socket = (long)trunc((double)(this->total_duration_ms / this->ms_delay_between_batch)) * this->n_queries_per_batch;
+	max_queries_total = max_queries_per_socket * this->n_sockets;
 	return 0;
 }
 void ArgumentParser::print_arguments()
@@ -79,7 +81,5 @@ void ArgumentParser::print_arguments()
 
 void ArgumentParser::print_arguments(FILE *stream)
 {
-	unsigned long max_queries_per_socket = (long)trunc((double)(this->total_duration_ms / this->ms_delay_between_batch)) * this->n_queries_per_batch;
-	unsigned long max_queries_total = max_queries_per_socket * this->n_sockets;
-	fprintf(stream, "Querying %s:%hd, with %lu queries every %lu milliseconds, from %lu sockets, for %lu seconds (maximum %lu queries on one socket, %lu queries total)\n", this->ip.c_str(), this->port, this->n_queries_per_batch, this->ms_delay_between_batch, this->n_sockets, this->total_duration_ms, max_queries_per_socket, max_queries_total);
+	fprintf(stream, "Querying %s:%hd, with %lu queries every %lu milliseconds, from %lu sockets, for %lu seconds (maximum %lu queries on one socket, %lu queries total)\n", this->ip.c_str(), this->port, this->n_queries_per_batch, this->ms_delay_between_batch, this->n_sockets, this->total_duration_ms, this->max_queries_per_socket, this->max_queries_total);
 }
