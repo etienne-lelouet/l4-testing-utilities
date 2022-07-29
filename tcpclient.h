@@ -9,29 +9,29 @@
 
 using namespace std;
 
-class Tcpclient_close : public Sender
-{
-public:
-	ArgumentParser &args;
-	vector<uv_buf_t> *queries;
-	uv_loop_t *loop;
-	struct sockaddr_in *dest;
-	uv_timer_t *total_timer;
-	uv_timer_t *delay_timer;
-	uv_tcp_t *socket;
-	vector<int> sent;
-	int index_in_query_list;
+// class Tcpclient_close : public Sender
+// {
+// public:
+// 	ArgumentParser args;
+// 	vector<uv_buf_t> *queries;
+// 	uv_loop_t *loop;
+// 	struct sockaddr_in *dest;
+// 	uv_timer_t *total_timer;
+// 	uv_timer_t *delay_timer;
+// 	uv_tcp_t *socket;
+// 	vector<int> sent;
+// 	int index_in_query_list;
 
-	Tcpclient_close(vector<uv_buf_t> *queries, struct sockaddr_in *dest, ArgumentParser &args, uv_loop_t *loop);
-	void run();
-	void stop();
-};
-#define handle_tcpclient_close(handle) ((Tcpclient_close *)(handle->data))
+// 	Tcpclient_close(vector<uv_buf_t> *queries, struct sockaddr_in *dest, ArgumentParser &args, uv_loop_t *loop);
+// 	void run();
+// 	void stop();
+// };
+// #define handle_tcpclient_close(handle) ((Tcpclient_close *)(handle->data))
 
 class Tcpclient_keepalive : public Sender
 {
 public:
-	ArgumentParser &args;
+	ArgumentParser *args;
 	vector<uv_buf_t> *queries;
 	uv_loop_t *loop;
 	struct sockaddr_in *dest;
@@ -41,7 +41,7 @@ public:
 	vector<int> sent;
 	int index_in_query_list;
 	string canary;
-	Tcpclient_keepalive(ArgumentParser &args, vector<uv_buf_t> *queries, struct sockaddr_in *dest, uv_loop_t *loop);
+	Tcpclient_keepalive(ArgumentParser *args, vector<uv_buf_t> *queries, struct sockaddr_in *dest, uv_loop_t *loop);
 	void run();
 	void stop();
 };

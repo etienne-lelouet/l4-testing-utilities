@@ -11,7 +11,7 @@ using namespace std;
 
 int generate_dns_queries(uint16_t number, int type, vector<uv_buf_t> *result, string &query_name)
 {
-	for (int id = 0; id < number; id++)
+	for (uint16_t id = 0; id < number; id++)
 	{
 		int query_len;
 		char *dns_msg = (char *)malloc(PACKETSZ);
@@ -22,7 +22,8 @@ int generate_dns_queries(uint16_t number, int type, vector<uv_buf_t> *result, st
 			free(dns_msg);
 			return 1;
 		}
-		*dns_msg = id;
+		uint16_t id_nbo = htons(id);
+		memcpy(dns_msg, &id_nbo, sizeof(id_nbo));
 		size_t dns_msg_len = (size_t)query_len;
 		if (type == TYPE_TCP)
 		{

@@ -8,6 +8,8 @@ using namespace std;
 
 ArgumentParser::ArgumentParser() : ip("127.0.0.1"), port(6000), ms_delay_between_batch(1000), n_queries_per_batch(1), n_sockets(1), total_duration_ms(10000), query_name("jeanpierre.moe"), max_queries_per_socket(10), max_queries_total(10) {}
 
+ArgumentParser::ArgumentParser(ArgumentParser &old) : ip(old.ip), port(old.port), ms_delay_between_batch(old.ms_delay_between_batch), n_queries_per_batch(old.n_queries_per_batch), n_sockets(old.n_sockets), total_duration_ms(old.total_duration_ms), query_name(old.query_name), max_queries_per_socket(old.max_queries_per_socket), max_queries_total(old.max_queries_total) {}
+
 int ArgumentParser::parse_arguments(int argc, char **argv)
 {
 	int opt;

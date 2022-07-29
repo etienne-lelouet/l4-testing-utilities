@@ -14,6 +14,7 @@ public:
 	unsigned long max_queries_per_socket;
 	unsigned long max_queries_total;
 	ArgumentParser();
+	ArgumentParser(ArgumentParser &old);
 
 	int parse_arguments(int argc, char **argv);
 	void print_arguments();
